@@ -148,7 +148,7 @@ def main():
     print(f"  [FN: {FN:<4} | TP: {TP:<4}]")
 
     # --------------------------------------------------------------------------
-    # TAHAP 3: SISTEM REKOMENDASI VIA TERMINAL
+    # TAHAP 3: REKOMENDASI
     # --------------------------------------------------------------------------
     print("\n" + "="*75)
     print("INPUT PENGGUNA UNTUK PREDIKSI AIR BARU")
