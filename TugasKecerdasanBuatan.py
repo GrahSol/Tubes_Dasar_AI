@@ -7,7 +7,7 @@ import numpy as np
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. FUNGSI KNN MANUAL
+# 1. FUNGSI KNN
 # ------------------------------------------------------------------------------
 def euclidean_distance(X_train, test_row):
     """
@@ -40,10 +40,10 @@ def predict_knn(X_train, y_train, X_test, k):
     return np.array(predictions)
 
 # ------------------------------------------------------------------------------
-# 2. FUNGSI EVALUASI MANUAL
+# 2. FUNGSI EVALUASI 
 # ------------------------------------------------------------------------------
 def evaluate_model(y_true, y_pred):
-    """Menghitung Accuracy dan Confusion Matrix (TP, TN, FP, FN) secara manual"""
+    """Menghitung Accuracy dan Confusion Matrix (TP, TN, FP, FN)"""
     TP, TN, FP, FN = 0, 0, 0, 0
     correct = 0
     
@@ -212,8 +212,6 @@ def main():
                 print("REKOMENDASI PENGGUNAAN AIR:")
                 print("1. Minum")
                 print("2. Memasak")
-                print("3. Mandi")
-                print("4. Mencuci")
             else:
                 print("TIDAK LAYAK MINUM (Not Potable)\n")
                 print("REKOMENDASI PENGGUNAAN AIR:")
