@@ -98,6 +98,19 @@ def main():
     y = df['Potability'].values
     fitur_names = df.drop('Potability', axis=1).columns.tolist()
 
+    # --- ATURAN KAMUS SKALA RESMI (BERDASARKAN DATASET & ATURAN FISIS) ---
+    skala_rules = {
+        'ph': (0.00, 14.00, "Skala Formal 0-14"),
+        'hardness': (47.43, 323.12, "mg/L"),
+        'solids': (320.94, 61227.20, "ppm"),
+        'chloramines': (0.35, 13.13, "ppm"),
+        'sulfate': (129.00, 481.03, "mg/L"),
+        'conductivity': (181.48, 753.34, "µS/cm"),
+        'organic_carbon': (2.20, 28.30, "ppm"),
+        'trihalomethanes': (0.74, 124.00, "µg/L"),
+        'turbidity': (1.45, 6.74, "NTU")
+    }
+
     # Membagi data menjadi training (80%) dan testing (20%) SEBELUM normalisasi
     np.random.seed(42)
     indices = np.random.permutation(len(X))
@@ -148,7 +161,7 @@ def main():
     print(f"  [FN: {FN:<4} | TP: {TP:<4}]")
 
     # --------------------------------------------------------------------------
-    # TAHAP 3: REKOMENDASI
+    # TAHAP 3: REKOMENDASI VIA TERMINAL INTERAKTIF
     # --------------------------------------------------------------------------
     print("\n" + "="*75)
     print("INPUT PENGGUNA UNTUK PREDIKSI AIR BARU")
@@ -156,25 +169,55 @@ def main():
 
     while True:
         user_data = []
-        try:
-            print("\nSilakan masukkan nilai parameter kualitas air (Ketik 'q' untuk keluar):")
+        batal = False # Bendera (flag) untuk mengecek apakah user ingin keluar
+        
+        print("\nSilakan masukkan nilai parameter kualitas air (Ketik 'q' untuk keluar):")
+        
+        for fitur in fitur_names:
+            # Normalisasi nama variabel kunci untuk pencarian di kamus aturan skala
+            key_lookup = fitur.lower().replace(" ", "_")
             
-            batal = False # Bendera (flag) untuk mengecek apakah user ingin keluar
-            for fitur in fitur_names:
-                val = input(f"Masukkan nilai {fitur}: ")
+            # Ambil batas minimum dan maksimum berdasarkan data yang diberikan
+            if key_lookup in skala_rules:
+                min_skala, max_skala, unit = skala_rules[key_lookup]
+            else:
+                # Fallback cadangan dinamis jika ada ketidakcocokan nama kolom asli
+                min_skala = df[fitur].min()
+                max_skala = df[fitur].max()
+                unit = ""
+            
+            while True:
+                val = input(f"Masukkan nilai {fitur} (Valid: {min_skala:.2f} s/d {max_skala:.2f} {unit}): ")
                 
-                # Jika user mengetik 'q' atau 'Q', langsung hentikan pengisian
+                # Jika user mengetik 'q' atau 'Q', aktifkan bendera batal keluar dari loop input
                 if val.lower() == 'q':
                     batal = True
                     break
-                    
-                user_data.append(float(val))
-            
-            # Jika user memilih batal (keluar), maka hentikan program utama
-            if batal:
-                print("\nTerima kasih telah menggunakan Sistem Klasifikasi Kelayakan Air Minum!")
-                break
                 
+                try:
+                    val_float = float(val)
+                    
+                    # --- PROSES VALIDASI BATASAN SKALA YANG KETAT ---
+                    if not (min_skala <= val_float <= max_skala):
+                        print(f"    [MELEWATI BATAS] Nilai yang dimasukkan kelewatan! {fitur} harus berada di rentang {min_skala:.2f} s/d {max_skala:.2f} {unit}.")
+                        continue
+                    
+                    # Jika lolos pengecekan skala, simpan nilai parameter
+                    user_data.append(val_float)
+                    break
+                    
+                except ValueError:
+                    print("    [ERROR] Masukan tidak valid! Harus berupa angka (gunakan titik '.' untuk desimal).\n")
+            
+            if batal:
+                break
+        
+        # Jika proses dibatalkan pengguna, hentikan program interaktif keseluruhan
+        if batal:
+            print("\nTerima kasih telah menggunakan Sistem Klasifikasi Kelayakan Air Minum!")
+            break
+            
+        try:
             # Normalisasi input pengguna menggunakan X_min dan range_values dari Data Latih
             user_data_norm = (np.array(user_data) - X_min) / range_values
             
@@ -191,7 +234,7 @@ def main():
             
             prediksi = 1 if votes_layak > votes_tidak_layak else 0
 
-            # Tampilkan Hasil Analisis sesuai template
+            # Tampilkan Hasil Analisis sesuai template laporan
             print("\n" + "="*75)
             print("HASIL ANALISIS KELAYAKAN AIR")
             print("="*75)
@@ -224,8 +267,8 @@ def main():
                 print("\nTerima kasih telah menggunakan Sistem Klasifikasi Kelayakan Air Minum!")
                 break
             
-        except ValueError:
-            print("\n[ERROR] Masukan harus berupa angka (gunakan titik '.' untuk desimal).\n")
+        except Exception as e:
+            print(f"\n[ERROR] Terjadi kesalahan dalam proses kalkulasi: {e}\n")
 
 if __name__ == "__main__":
     main()
