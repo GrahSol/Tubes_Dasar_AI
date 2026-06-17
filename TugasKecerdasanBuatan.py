@@ -3,34 +3,48 @@ import numpy as np
 
 # ==============================================================================
 # TUGAS BESAR KECERDASAN BUATAN
-# Sistem Klasifikasi dan Rekomendasi Kelayakan Air Minum Menggunakan KNN
+# Sistem Klasifikasi Kelayakan Air Minum Menggunakan KNN
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. FUNGSI KNN
+# 1. FUNGSI KNN (K-Nearest Neighbor)
 # ------------------------------------------------------------------------------
 def euclidean_distance(X_train, test_row):
     """
-    Menghitung jarak Euclidean antara 1 data uji (test_row) dengan seluruh data latih (X_train).
-    Menggunakan fitur broadcasting numpy agar komputasi jauh lebih cepat.
+    Menghitung jarak Euclidean (L2) menggunakan optimasi broadcasting NumPy.
+    - (X_train - test_row): Mencari selisih nilai fitur antara data latih dan input.
+    - ** 2: Menguadratkan selisih agar nilai negatif menjadi positif.
+    - np.sum(..., axis=1): Menjumlahkan total kuadrat secara horizontal (per baris data).
+    - np.sqrt: Menarik akar kuadrat dari total penjumlahan untuk mendapatkan jarak akhir (d).
     """
     distances = np.sqrt(np.sum((X_train - test_row) ** 2, axis=1))
     return distances
 
 def get_neighbors(distances, y_train, k):
-    """Mencari K tetangga terdekat berdasarkan jarak terkecil"""
+    """
+    Mencari K tetangga dengan jarak terdekat.
+    - np.argsort: Mengurutkan jarak dari terkecil ke terbesar, mengembalikan indeks barisnya.
+    - [:k]: Memotong array hanya untuk mengambil sejumlah K indeks teratas.
+    - y_train[...]: Mengambil label kelas (Layak/Tidak) dari indeks terpilih.
+    """
     nearest_indices = np.argsort(distances)[:k]
     nearest_labels = y_train[nearest_indices]
     return nearest_labels, nearest_indices
 
 def majority_voting(nearest_labels):
-    """Melakukan voting mayoritas dari label tetangga terdekat"""
+    """
+    Melakukan pemungutan suara (voting) untuk menentukan prediksi akhir.
+    - max(set(...), key=count): Mencari elemen (label) yang paling sering muncul di dalam list K tetangga.
+    """
     labels_list = nearest_labels.tolist()
     prediction = max(set(labels_list), key=labels_list.count)
     return prediction
 
 def predict_knn(X_train, y_train, X_test, k):
-    """Fungsi prediksi untuk seluruh data uji"""
+    """
+    Menjalankan alur prediksi untuk seluruh dataset uji secara iteratif (Lazy Learning).
+    Hasil prediksi setiap baris disimpan ke dalam array Numpy.
+    """
     predictions = []
     for test_row in X_test:
         distances = euclidean_distance(X_train, test_row)
@@ -40,17 +54,21 @@ def predict_knn(X_train, y_train, X_test, k):
     return np.array(predictions)
 
 # ------------------------------------------------------------------------------
-# 2. FUNGSI EVALUASI 
+# 2. FUNGSI EVALUASI MODEL 
 # ------------------------------------------------------------------------------
 def evaluate_model(y_true, y_pred):
-    """Menghitung Accuracy dan Confusion Matrix (TP, TN, FP, FN)"""
+    """
+    Menghitung metrik performa model (Accuracy) dan Confusion Matrix.
+    - True Positive (TP) : Asli Layak (1), Prediksi Layak (1)
+    - True Negative (TN) : Asli Tidak Layak (0), Prediksi Tidak Layak (0)
+    - False Positive (FP): Asli Tidak Layak (0), Prediksi Layak (1) -> Error
+    - False Negative (FN): Asli Layak (1), Prediksi Tidak Layak (0) -> Error
+    """
     TP, TN, FP, FN = 0, 0, 0, 0
     correct = 0
-    
     for actual, pred in zip(y_true, y_pred):
         if actual == pred:
             correct += 1
-            
         if actual == 1 and pred == 1:
             TP += 1
         elif actual == 0 and pred == 0:
@@ -59,59 +77,49 @@ def evaluate_model(y_true, y_pred):
             FP += 1
         elif actual == 1 and pred == 0:
             FN += 1
-            
     accuracy = correct / len(y_true)
     return accuracy, TP, TN, FP, FN
 
 def main():
     print("="*75)
-    print("SISTEM KLASIFIKASI DAN REKOMENDASI KELAYAKAN AIR MINUM")
+    print("SISTEM KLASIFIKASI KELAYAKAN AIR MINUM")
     print("MENGGUNAKAN ALGORITMA K-NEAREST NEIGHBOR (KNN)")
     print("="*75)
 
-    # --------------------------------------------------------------------------
-    # TAHAP 1: PREPROCESSING DATA
-    # --------------------------------------------------------------------------
     print("\n[1] Membaca Dataset dan Preprocessing...")
     try:
-        # Membaca dataset
         df = pd.read_csv('water_potability.csv')
     except FileNotFoundError:
         print("ERROR: File 'water_potability.csv' tidak ditemukan!")
         return
 
-    # Mengecek missing value sebelum diisi
     missing_before = df.isnull().sum().sum()
     print(f"    -> Ditemukan total {missing_before} missing value.")
     
-    # Mengisi missing value dengan rata-rata (Mean Imputation)
     df.fillna(df.mean(), inplace=True)
     
-    # Mengecek dan menghapus data duplikat
     duplikat = df.duplicated().sum()
     print(f"    -> Ditemukan {duplikat} data duplikat.")
     if duplikat > 0:
         df.drop_duplicates(inplace=True)
 
-    # Memisahkan atribut fitur (X) dan target label (y)
     X = df.drop('Potability', axis=1).values
     y = df['Potability'].values
     fitur_names = df.drop('Potability', axis=1).columns.tolist()
 
-    # --- ATURAN KAMUS SKALA RESMI (BERDASARKAN DATASET & ATURAN FISIS) ---
-    skala_rules = {
-        'ph': (0.00, 14.00, "Skala Formal 0-14"),
-        'hardness': (47.43, 323.12, "mg/L"),
-        'solids': (320.94, 61227.20, "ppm"),
-        'chloramines': (0.35, 13.13, "ppm"),
-        'sulfate': (129.00, 481.03, "mg/L"),
-        'conductivity': (181.48, 753.34, "µS/cm"),
-        'organic_carbon': (2.20, 28.30, "ppm"),
-        'trihalomethanes': (0.74, 124.00, "µg/L"),
-        'turbidity': (1.45, 6.74, "NTU")
+    # Aturan Skala disesuaikan dengan rentang wajar dataset
+    aturan_skala = {
+        'ph':              (0.0, 14.0, "0.0 - 14.0"),
+        'hardness':        (0.0, 350.0, "0.0 - 350.0 mg/L"),
+        'solids':          (0.0, 65000.0, "0.0 - 65000.0 ppm"),
+        'chloramines':     (0.0, 15.0, "0.0 - 15.0 ppm"),
+        'sulfate':         (0.0, 500.0, "0.0 - 500.0 mg/L"),
+        'conductivity':    (0.0, 800.0, "0.0 - 800.0 µS/cm"),
+        'organic_carbon':  (0.0, 35.0, "0.0 - 35.0 ppm"),
+        'trihalomethanes': (0.0, 130.0, "0.0 - 130.0 µg/L"),
+        'turbidity':       (0.0, 8.0, "0.0 - 8.0 NTU")
     }
 
-    # Membagi data menjadi training (80%) dan testing (20%) SEBELUM normalisasi
     np.random.seed(42)
     indices = np.random.permutation(len(X))
     split_idx = int(len(X) * 0.8)
@@ -120,112 +128,146 @@ def main():
     X_train_raw, X_test_raw = X[train_indices], X[test_indices]
     y_train, y_test = y[train_indices], y[test_indices]
 
-    # Normalisasi Min-Max pada data latih
     X_min = X_train_raw.min(axis=0)
     X_max = X_train_raw.max(axis=0)
     
-    # Mencegah Division by Zero jika ada fitur dengan max == min
     range_values = X_max - X_min
     range_values[range_values == 0] = 1
     
-    # Terapkan normalisasi ke Data Latih dan Data Uji menggunakan nilai dari Data Latih
     X_train = (X_train_raw - X_min) / range_values
     X_test = (X_test_raw - X_min) / range_values
 
     print(f"    -> Normalisasi selesai. Data Latih: {len(X_train)} baris, Data Uji: {len(X_test)} baris.")
 
-    # --------------------------------------------------------------------------
-    # TAHAP 2: PENGUJIAN K-NEAREST NEIGHBOR
-    # --------------------------------------------------------------------------
     print("\n[2] Mengevaluasi Hyperparameter K...")
     k_values = [1, 3, 5, 7, 9]
     best_k = -1
     best_acc = 0.0
-    best_cm = None
+    best_cm = (0, 0, 0, 0) # Variabel penyimpan Confusion Matrix terbaik
 
     for k in k_values:
         y_pred = predict_knn(X_train, y_train, X_test, k)
-        acc, TP, TN, FP, FN = evaluate_model(y_test, y_pred)
-        
-        print(f"    -> Untuk K={k} | Akurasi: {acc*100:.2f}%")
+        acc, tp, tn, fp, fn = evaluate_model(y_test, y_pred)
+        print(f"    -> Untuk K={k:<2} | Akurasi: {acc*100:.2f}%")
         
         if acc > best_acc:
             best_acc = acc
             best_k = k
-            best_cm = (TP, TN, FP, FN)
+            best_cm = (tp, tn, fp, fn)
 
-    TP, TN, FP, FN = best_cm
-    print(f"\n[HASIL TERBAIK] Nilai K terbaik adalah K={best_k} dengan Akurasi {best_acc*100:.2f}%\n")
-    print("Confusion Matrix:")
-    print(f"  [TN: {TN:<4} | FP: {FP:<4}]")
-    print(f"  [FN: {FN:<4} | TP: {TP:<4}]")
+    
+    print(f"\n[HASIL TERBAIK] Nilai K terbaik adalah K={best_k} dengan Akurasi {best_acc*100:.2f}%")
+    print("-" * 75)
+    print("Confusion Matrix pada K Terbaik:")
+    print(f" - True Positive (TP)  : {best_cm[0]:<4} (Asli Layak, Prediksi Layak)")
+    print(f" - True Negative (TN)  : {best_cm[1]:<4} (Asli Tidak Layak, Prediksi Tidak Layak)")
+    print(f" - False Positive (FP) : {best_cm[2]:<4} (Error: Asli Tidak Layak, Prediksi Layak)")
+    print(f" - False Negative (FN) : {best_cm[3]:<4} (Error: Asli Layak, Prediksi Tidak Layak)")
+    print("-" * 75)
 
-    # --------------------------------------------------------------------------
-    # TAHAP 3: REKOMENDASI VIA TERMINAL INTERAKTIF
-    # --------------------------------------------------------------------------
     print("\n" + "="*75)
     print("INPUT PENGGUNA UNTUK PREDIKSI AIR BARU")
     print("="*75)
 
+    
+    #INPUT DAN VALIDASI DATA PENGGUNA
     while True:
         user_data = []
-        batal = False # Bendera (flag) untuk mengecek apakah user ingin keluar
+        batal = False 
         
         print("\nSilakan masukkan nilai parameter kualitas air (Ketik 'q' untuk keluar):")
         
         for fitur in fitur_names:
-            # Normalisasi nama variabel kunci untuk pencarian di kamus aturan skala
             key_lookup = fitur.lower().replace(" ", "_")
-            
-            # Ambil batas minimum dan maksimum berdasarkan data yang diberikan
-            if key_lookup in skala_rules:
-                min_skala, max_skala, unit = skala_rules[key_lookup]
+            if key_lookup in aturan_skala:
+                min_riil, max_riil, label_skala = aturan_skala[key_lookup]
             else:
-                # Fallback cadangan dinamis jika ada ketidakcocokan nama kolom asli
-                min_skala = df[fitur].min()
-                max_skala = df[fitur].max()
-                unit = ""
+                min_riil, max_riil, label_skala = (0.0, 1000000.0, "0 - 1.000.000")
             
             while True:
-                val = input(f"Masukkan nilai {fitur} (Valid: {min_skala:.2f} s/d {max_skala:.2f} {unit}): ")
-                
-                # Jika user mengetik 'q' atau 'Q', aktifkan bendera batal keluar dari loop input
+                val = input(f"Masukkan nilai {fitur} (Skala Distribusi: {label_skala}): ")
                 if val.lower() == 'q':
                     batal = True
                     break
-                
                 try:
                     val_float = float(val)
-                    
-                    # --- PROSES VALIDASI BATASAN SKALA YANG KETAT ---
-                    if not (min_skala <= val_float <= max_skala):
-                        print(f"    [MELEWATI BATAS] Nilai yang dimasukkan kelewatan! {fitur} harus berada di rentang {min_skala:.2f} s/d {max_skala:.2f} {unit}.")
+                    if not (min_riil <= val_float <= max_riil):
+                        print(f"    [VALIDASI] Nilai menembus batas distribusi wajar! {fitur} harus berada di rentang {label_skala}.")
                         continue
-                    
-                    # Jika lolos pengecekan skala, simpan nilai parameter
                     user_data.append(val_float)
                     break
-                    
                 except ValueError:
-                    print("    [ERROR] Masukan tidak valid! Harus berupa angka (gunakan titik '.' untuk desimal).\n")
+                    print("    [ERROR] Masukan tidak valid! Harus berupa angka.\n")
             
             if batal:
                 break
         
-        # Jika proses dibatalkan pengguna, hentikan program interaktif keseluruhan
         if batal:
             print("\nTerima kasih telah menggunakan Sistem Klasifikasi Kelayakan Air Minum!")
             break
             
         try:
-            # Normalisasi input pengguna menggunakan X_min dan range_values dari Data Latih
+            # TAHAP 1. Normalisasi
             user_data_norm = (np.array(user_data) - X_min) / range_values
             
-            # Prediksi menggunakan Euclidean Distance dan tetangga terdekat
+            
+            garis_norm = "=" * 108
+            print("\n" + garis_norm)
+            print("TAHAP 1: PROSES NORMALISASI INPUT PENGGUNA (MIN-MAX SCALING)")
+            print(garis_norm)
+            print(f"| {'Parameter (Fitur)':<17} | {'Input Asli (X)':<14} | {'X_min Dataset':<13} | {'X_max Dataset':<13} | {'Perhitungan ke Skala 0-1 (X_norm)':<33} |")
+            print("-" * 108)
+            for i, fitur in enumerate(fitur_names):
+                x_val = user_data[i]
+                xmin_val = X_min[i]
+                xmax_val = X_max[i]
+                xnorm_val = user_data_norm[i]
+                rumus_norm = f"({x_val:.2f} - {xmin_val:.2f}) / {range_values[i]:.2f} = {xnorm_val:.4f}"
+                print(f"| {fitur:<17} | {x_val:<14.2f} | {xmin_val:<13.2f} | {xmax_val:<13.2f} | {rumus_norm:<33} |")
+            print(garis_norm)
+            # ==================================================================
+
+            # TAHAP 2. Hitung Jarak dan Ambil Tetangga
             jarak = euclidean_distance(X_train, user_data_norm)
             nearest_labels, nearest_indices = get_neighbors(jarak, y_train, best_k)
             
-            # Hitung jumlah voting dan persentasenya
+            
+            batas_garis = "=" * 148
+            garis_pisah = "-" * 148
+            
+            print("\n" + batas_garis)
+            print("TAHAP 2: URUTKAN DATA BERDASARKAN HASIL PERHITUNGAN JARAK EUCLIDEAN")
+            print(batas_garis)
+            
+            print(f"| {'Baris':<5} | {'pH':<4} | {'Hard':<4} | {'Solid':<5} | {'Chlo':<4} | {'Sulf':<4} | {'Cond':<4} | {'OrgC':<4} | {'Trih':<4} | {'Turb':<4} | {'Status':<11} | {'Jarak Euclidean (Substitusi Rumus)':<44} | {'Rank':<4} |")
+            print(garis_pisah)
+            
+            def fmt(v, w):
+                s = f"{v:.1f}"
+                if len(s) > w: s = f"{v:.0f}"
+                return s[:w].ljust(w)
+
+            for rank, idx in enumerate(nearest_indices):
+                label_teks = "Layak" if nearest_labels[rank] == 1 else "Tidak Layak"
+                raw = X_train_raw[idx]
+                norm = X_train[idx]
+                
+                # Mengambil nilai normalisasi fitur ke-1 (pH) dan ke-2 (Hardness)
+                u1, u2 = user_data_norm[0], user_data_norm[1]
+                t1, t2 = norm[0], norm[1]
+                
+                rumus_teks = f"(({u1:.2f}-{t1:.2f})² + ({u2:.2f}-{t2:.2f})² + ...) = {jarak[idx]:.4f}"
+                
+                print(f"| {idx:<5} | {fmt(raw[0],4)} | {fmt(raw[1],4)} | {fmt(raw[2],5)} | {fmt(raw[3],4)} | {fmt(raw[4],4)} | {fmt(raw[5],4)} | {fmt(raw[6],4)} | {fmt(raw[7],4)} | {fmt(raw[8],4)} | {label_teks:<11} | {rumus_teks:<44} | {rank+1:<4} |")
+            
+            print(garis_pisah)
+            
+            u = user_data
+            print(f"| {'INPUT':<5} | {fmt(u[0],4)} | {fmt(u[1],4)} | {fmt(u[2],5)} | {fmt(u[3],4)} | {fmt(u[4],4)} | {fmt(u[5],4)} | {fmt(u[6],4)} | {fmt(u[7],4)} | {fmt(u[8],4)} | {'?':<11} | {'-':<44} | {'-':<4} |")
+            print(batas_garis)
+            # ==================================================================
+
+            # TAHAP 3 Hasil Analisis Kelayakan Air
             votes_layak = np.sum(nearest_labels == 1)
             votes_tidak_layak = np.sum(nearest_labels == 0)
             
@@ -234,11 +276,9 @@ def main():
             
             prediksi = 1 if votes_layak > votes_tidak_layak else 0
 
-            # Tampilkan Hasil Analisis sesuai template laporan
             print("\n" + "="*75)
-            print("HASIL ANALISIS KELAYAKAN AIR")
+            print("TAHAP 3: HASIL ANALISIS KELAYAKAN AIR")
             print("="*75)
-            
             print(f"\nNilai K yang digunakan : {best_k}\n")
             
             print("Hasil Voting KNN:")
@@ -252,14 +292,8 @@ def main():
             print("STATUS AIR:")
             if prediksi == 1:
                 print("LAYAK MINUM (Potable)\n")
-                print("REKOMENDASI PENGGUNAAN AIR:")
-                print("1. Minum")
-                print("2. Memasak")
             else:
                 print("TIDAK LAYAK MINUM (Not Potable)\n")
-                print("REKOMENDASI PENGGUNAAN AIR:")
-                print("1. Mandi")
-                print("2. Mencuci")
             print("="*75)
             
             lanjut = input("\nApakah Anda ingin mengecek sampel air lagi? (y/n): ")
