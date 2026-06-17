@@ -298,7 +298,7 @@ def main():
             
             lanjut = input("\nApakah Anda ingin mengecek sampel air lagi? (y/n): ")
             if lanjut.lower() != 'y':
-                print("\nTerima kasih telah menggunakan Sistem Klasifikasi Kelayakan Air Minum!")
+                print("\nPROGRAM SELESAI")
                 break
             
         except Exception as e:
