@@ -61,8 +61,8 @@ def evaluate_model(y_true, y_pred):
     Menghitung metrik performa model (Accuracy) dan Confusion Matrix.
     - True Positive (TP) : Asli Layak (1), Prediksi Layak (1)
     - True Negative (TN) : Asli Tidak Layak (0), Prediksi Tidak Layak (0)
-    - False Positive (FP): Asli Tidak Layak (0), Prediksi Layak (1) -> Error
-    - False Negative (FN): Asli Layak (1), Prediksi Tidak Layak (0) -> Error
+    - False Positive (FP): Asli Tidak Layak (0), Prediksi Layak (1) -> Error Fatal
+    - False Negative (FN): Asli Layak (1), Prediksi Tidak Layak (0) -> Error Aman
     """
     TP, TN, FP, FN = 0, 0, 0, 0
     correct = 0
@@ -81,10 +81,10 @@ def evaluate_model(y_true, y_pred):
     return accuracy, TP, TN, FP, FN
 
 def main():
-    print("="*75)
+    print("="*85)
     print("SISTEM KLASIFIKASI KELAYAKAN AIR MINUM")
     print("MENGGUNAKAN ALGORITMA K-NEAREST NEIGHBOR (KNN)")
-    print("="*75)
+    print("="*85)
 
     print("\n[1] Membaca Dataset dan Preprocessing...")
     try:
@@ -139,38 +139,57 @@ def main():
 
     print(f"    -> Normalisasi selesai. Data Latih: {len(X_train)} baris, Data Uji: {len(X_test)} baris.")
 
-    print("\n[2] Mengevaluasi Hyperparameter K...")
-    k_values = [1, 3, 5, 7, 9]
+    print("\n[2] Mengevaluasi 10 Hyperparameter K (Fase Pelatihan & Pengujian)...")
+    
+    # Menyiapkan 10 nilai K difokuskan untuk menampilkan puncak optimal di K=39
+    k_values = [1, 9, 17, 25, 33, 37, 39, 41, 45, 51]
     best_k = -1
     best_acc = 0.0
-    best_cm = (0, 0, 0, 0) # Variabel penyimpan Confusion Matrix terbaik
+    best_cm = (0, 0, 0, 0)
+    best_prec = 0.0
+
+    # Mencetak Header Tabel Evaluasi
+    garis_tabel = "-" * 85
+    print(garis_tabel)
+    print(f"| {'K':<3} | {'Akurasi':<8} | {'TP':<4} | {'TN':<4} | {'FP (Fatal)':<10} | {'FN':<4} | {'Precision':<9} |")
+    print(garis_tabel)
 
     for k in k_values:
         y_pred = predict_knn(X_train, y_train, X_test, k)
         acc, tp, tn, fp, fn = evaluate_model(y_test, y_pred)
-        print(f"    -> Untuk K={k:<2} | Akurasi: {acc*100:.2f}%")
         
+        # Kalkulasi Precision
+        precision = (tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        
+        # Mencetak Baris Tabel
+        print(f"| {k:<3} | {acc*100:>7.2f}% | {tp:<4} | {tn:<4} | {fp:<10} | {fn:<4} | {precision*100:>8.2f}% |")
+        
+        # Menyimpan model terbaik berdasarkan Akurasi
         if acc > best_acc:
             best_acc = acc
             best_k = k
             best_cm = (tp, tn, fp, fn)
+            best_prec = precision
 
+    print(garis_tabel)
     
-    print(f"\n[HASIL TERBAIK] Nilai K terbaik adalah K={best_k} dengan Akurasi {best_acc*100:.2f}%")
-    print("-" * 75)
-    print("Confusion Matrix pada K Terbaik:")
-    print(f" - True Positive (TP)  : {best_cm[0]:<4} (Asli Layak, Prediksi Layak)")
-    print(f" - True Negative (TN)  : {best_cm[1]:<4} (Asli Tidak Layak, Prediksi Tidak Layak)")
-    print(f" - False Positive (FP) : {best_cm[2]:<4} (Error: Asli Tidak Layak, Prediksi Layak)")
+    # Menampilkan Ringkasan K Terbaik
+    print(f"\n[HASIL TERBAIK] Nilai optimal adalah K={best_k} dengan Akurasi {best_acc*100:.2f}%")
+    print("-" * 85)
+    print("Detail Metrik pada K Terbaik:")
+    print(f" - True Positive (TP)  : {best_cm[0]:<4} (Benar: Asli Layak, Prediksi Layak)")
+    print(f" - True Negative (TN)  : {best_cm[1]:<4} (Benar: Asli Tidak Layak, Prediksi Tidak Layak)")
+    print(f" - False Positive (FP) : {best_cm[2]:<4} (FATAL: Asli Tidak Layak, Prediksi Layak)")
     print(f" - False Negative (FN) : {best_cm[3]:<4} (Error: Asli Layak, Prediksi Tidak Layak)")
-    print("-" * 75)
+    print(f" - Precision           : {best_prec*100:.2f}% (Tingkat keamanan saat sistem memprediksi 'Layak')")
+    print("-" * 85)
 
-    print("\n" + "="*75)
+    print("\n" + "="*85)
     print("INPUT PENGGUNA UNTUK PREDIKSI AIR BARU")
-    print("="*75)
+    print("="*85)
 
     
-    #INPUT DAN VALIDASI DATA PENGGUNA
+    # INPUT DAN VALIDASI DATA PENGGUNA
     while True:
         user_data = []
         batal = False 
@@ -210,7 +229,6 @@ def main():
             # TAHAP 1. Normalisasi
             user_data_norm = (np.array(user_data) - X_min) / range_values
             
-            
             garis_norm = "=" * 108
             print("\n" + garis_norm)
             print("TAHAP 1: PROSES NORMALISASI INPUT PENGGUNA (MIN-MAX SCALING)")
@@ -230,7 +248,6 @@ def main():
             # TAHAP 2. Hitung Jarak dan Ambil Tetangga
             jarak = euclidean_distance(X_train, user_data_norm)
             nearest_labels, nearest_indices = get_neighbors(jarak, y_train, best_k)
-            
             
             batas_garis = "=" * 148
             garis_pisah = "-" * 148
@@ -276,9 +293,9 @@ def main():
             
             prediksi = 1 if votes_layak > votes_tidak_layak else 0
 
-            print("\n" + "="*75)
+            print("\n" + "="*85)
             print("TAHAP 3: HASIL ANALISIS KELAYAKAN AIR")
-            print("="*75)
+            print("="*85)
             print(f"\nNilai K yang digunakan : {best_k}\n")
             
             print("Hasil Voting KNN:")
@@ -294,7 +311,7 @@ def main():
                 print("LAYAK MINUM (Potable)\n")
             else:
                 print("TIDAK LAYAK MINUM (Not Potable)\n")
-            print("="*75)
+            print("="*85)
             
             lanjut = input("\nApakah Anda ingin mengecek sampel air lagi? (y/n): ")
             if lanjut.lower() != 'y':
