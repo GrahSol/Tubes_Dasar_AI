@@ -12,10 +12,6 @@ import numpy as np
 def euclidean_distance(X_train, test_row):
     """
     Menghitung jarak Euclidean (L2) menggunakan optimasi broadcasting NumPy.
-    - (X_train - test_row): Mencari selisih nilai fitur antara data latih dan input.
-    - ** 2: Menguadratkan selisih agar nilai negatif menjadi positif.
-    - np.sum(..., axis=1): Menjumlahkan total kuadrat secara horizontal (per baris data).
-    - np.sqrt: Menarik akar kuadrat dari total penjumlahan untuk mendapatkan jarak akhir (d).
     """
     distances = np.sqrt(np.sum((X_train - test_row) ** 2, axis=1))
     return distances
@@ -23,9 +19,6 @@ def euclidean_distance(X_train, test_row):
 def get_neighbors(distances, y_train, k):
     """
     Mencari K tetangga dengan jarak terdekat.
-    - np.argsort: Mengurutkan jarak dari terkecil ke terbesar, mengembalikan indeks barisnya.
-    - [:k]: Memotong array hanya untuk mengambil sejumlah K indeks teratas.
-    - y_train[...]: Mengambil label kelas (Layak/Tidak) dari indeks terpilih.
     """
     nearest_indices = np.argsort(distances)[:k]
     nearest_labels = y_train[nearest_indices]
@@ -34,7 +27,6 @@ def get_neighbors(distances, y_train, k):
 def majority_voting(nearest_labels):
     """
     Melakukan pemungutan suara (voting) untuk menentukan prediksi akhir.
-    - max(set(...), key=count): Mencari elemen (label) yang paling sering muncul di dalam list K tetangga.
     """
     labels_list = nearest_labels.tolist()
     prediction = max(set(labels_list), key=labels_list.count)
@@ -43,7 +35,6 @@ def majority_voting(nearest_labels):
 def predict_knn(X_train, y_train, X_test, k):
     """
     Menjalankan alur prediksi untuk seluruh dataset uji secara iteratif (Lazy Learning).
-    Hasil prediksi setiap baris disimpan ke dalam array Numpy.
     """
     predictions = []
     for test_row in X_test:
@@ -58,7 +49,7 @@ def predict_knn(X_train, y_train, X_test, k):
 # ------------------------------------------------------------------------------
 def evaluate_model(y_true, y_pred):
     """
-    Menghitung metrik performa model (Accuracy) dan Confusion Matrix.
+    Menghitung metrik performa model dasar dan Confusion Matrix.
     - True Positive (TP) : Asli Layak (1), Prediksi Layak (1)
     - True Negative (TN) : Asli Tidak Layak (0), Prediksi Tidak Layak (0)
     - False Positive (FP): Asli Tidak Layak (0), Prediksi Layak (1) -> Error Fatal
@@ -81,10 +72,10 @@ def evaluate_model(y_true, y_pred):
     return accuracy, TP, TN, FP, FN
 
 def main():
-    print("="*85)
+    print("="*72)
     print("SISTEM KLASIFIKASI KELAYAKAN AIR MINUM")
     print("MENGGUNAKAN ALGORITMA K-NEAREST NEIGHBOR (KNN)")
-    print("="*85)
+    print("="*72)
 
     print("\n[1] Membaca Dataset dan Preprocessing...")
     try:
@@ -107,7 +98,6 @@ def main():
     y = df['Potability'].values
     fitur_names = df.drop('Potability', axis=1).columns.tolist()
 
-    # Aturan Skala disesuaikan dengan rentang wajar dataset
     aturan_skala = {
         'ph':              (0.0, 14.0, "0.0 - 14.0"),
         'hardness':        (0.0, 350.0, "0.0 - 350.0 mg/L"),
@@ -139,57 +129,54 @@ def main():
 
     print(f"    -> Normalisasi selesai. Data Latih: {len(X_train)} baris, Data Uji: {len(X_test)} baris.")
 
-    print("\n[2] Mengevaluasi 10 Hyperparameter K (Fase Pelatihan & Pengujian)...")
+    print("\n[2] Mengevaluasi Hyperparameter K (Fase Pelatihan & Pengujian)...")
     
-    # Menyiapkan 10 nilai K difokuskan untuk menampilkan puncak optimal di K=39
-    k_values = [1, 9, 17, 25, 33, 37, 39, 41, 45, 51]
+    # mencari nilai k terbaik
+    k_values = [1, 3, 5, 7, 9]
     best_k = -1
     best_acc = 0.0
+    best_f1 = 0.0
     best_cm = (0, 0, 0, 0)
-    best_prec = 0.0
 
-    # Mencetak Header Tabel Evaluasi
-    garis_tabel = "-" * 85
+    garis_tabel = "-" * 72
     print(garis_tabel)
-    print(f"| {'K':<3} | {'Akurasi':<8} | {'TP':<4} | {'TN':<4} | {'FP (Fatal)':<10} | {'FN':<4} | {'Precision':<9} |")
+    print(f"| {'K':<3} | {'Akurasi':<8} | {'TP':<4} | {'TN':<4} | {'FP (Fatal)':<10} | {'FN':<4} | {'F1-Score':<8} |")
     print(garis_tabel)
 
     for k in k_values:
         y_pred = predict_knn(X_train, y_train, X_test, k)
         acc, tp, tn, fp, fn = evaluate_model(y_test, y_pred)
         
-        # Kalkulasi Precision
-        precision = (tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        # Kalkulasi F1-Score untuk dicantumkan sebagai metrik pendukung
+        f1_score = (2 * tp) / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else 0.0
         
-        # Mencetak Baris Tabel
-        print(f"| {k:<3} | {acc*100:>7.2f}% | {tp:<4} | {tn:<4} | {fp:<10} | {fn:<4} | {precision*100:>8.2f}% |")
+        print(f"| {k:<3} | {acc*100:>7.2f}% | {tp:<4} | {tn:<4} | {fp:<10} | {fn:<4} | {f1_score*100:>7.2f}% |")
         
-        # Menyimpan model terbaik berdasarkan Akurasi
+        # KEMBALI KE RENCANA UTAMA: Mengunci K terbaik mutlak berdasarkan ACCURACY tertinggi
         if acc > best_acc:
             best_acc = acc
             best_k = k
+            best_f1 = f1_score
             best_cm = (tp, tn, fp, fn)
-            best_prec = precision
 
     print(garis_tabel)
     
-    # Menampilkan Ringkasan K Terbaik
-    print(f"\n[HASIL TERBAIK] Nilai optimal adalah K={best_k} dengan Akurasi {best_acc*100:.2f}%")
-    print("-" * 85)
-    print("Detail Metrik pada K Terbaik:")
+    # Menampilkan Ringkasan K Terbaik Berdasarkan Accuracy
+    print(f"\n[HASIL TERBAIK] Nilai optimal berdasarkan Accuracy adalah K={best_k}")
+    print(f"Metrik Utama Seleksi : Accuracy = {best_acc*100:.2f}%")
+    print(f"Metrik Pendukung     : F1-Score = {best_f1*100:.2f}%")
+    print("-" * 72)
+    print("Detail Confusion Matrix pada K Terbaik:")
     print(f" - True Positive (TP)  : {best_cm[0]:<4} (Benar: Asli Layak, Prediksi Layak)")
     print(f" - True Negative (TN)  : {best_cm[1]:<4} (Benar: Asli Tidak Layak, Prediksi Tidak Layak)")
     print(f" - False Positive (FP) : {best_cm[2]:<4} (FATAL: Asli Tidak Layak, Prediksi Layak)")
     print(f" - False Negative (FN) : {best_cm[3]:<4} (Error: Asli Layak, Prediksi Tidak Layak)")
-    print(f" - Precision           : {best_prec*100:.2f}% (Tingkat keamanan saat sistem memprediksi 'Layak')")
-    print("-" * 85)
+    print("-" * 72)
 
-    print("\n" + "="*85)
+    print("\n" + "="*72)
     print("INPUT PENGGUNA UNTUK PREDIKSI AIR BARU")
-    print("="*85)
+    print("="*72)
 
-    
-    # INPUT DAN VALIDASI DATA PENGGUNA
     while True:
         user_data = []
         batal = False 
@@ -226,7 +213,6 @@ def main():
             break
             
         try:
-            # TAHAP 1. Normalisasi
             user_data_norm = (np.array(user_data) - X_min) / range_values
             
             garis_norm = "=" * 108
@@ -243,9 +229,7 @@ def main():
                 rumus_norm = f"({x_val:.2f} - {xmin_val:.2f}) / {range_values[i]:.2f} = {xnorm_val:.4f}"
                 print(f"| {fitur:<17} | {x_val:<14.2f} | {xmin_val:<13.2f} | {xmax_val:<13.2f} | {rumus_norm:<33} |")
             print(garis_norm)
-            # ==================================================================
 
-            # TAHAP 2. Hitung Jarak dan Ambil Tetangga
             jarak = euclidean_distance(X_train, user_data_norm)
             nearest_labels, nearest_indices = get_neighbors(jarak, y_train, best_k)
             
@@ -269,7 +253,6 @@ def main():
                 raw = X_train_raw[idx]
                 norm = X_train[idx]
                 
-                # Mengambil nilai normalisasi fitur ke-1 (pH) dan ke-2 (Hardness)
                 u1, u2 = user_data_norm[0], user_data_norm[1]
                 t1, t2 = norm[0], norm[1]
                 
@@ -282,9 +265,7 @@ def main():
             u = user_data
             print(f"| {'INPUT':<5} | {fmt(u[0],4)} | {fmt(u[1],4)} | {fmt(u[2],5)} | {fmt(u[3],4)} | {fmt(u[4],4)} | {fmt(u[5],4)} | {fmt(u[6],4)} | {fmt(u[7],4)} | {fmt(u[8],4)} | {'?':<11} | {'-':<44} | {'-':<4} |")
             print(batas_garis)
-            # ==================================================================
 
-            # TAHAP 3 Hasil Analisis Kelayakan Air
             votes_layak = np.sum(nearest_labels == 1)
             votes_tidak_layak = np.sum(nearest_labels == 0)
             
@@ -293,9 +274,9 @@ def main():
             
             prediksi = 1 if votes_layak > votes_tidak_layak else 0
 
-            print("\n" + "="*85)
+            print("\n" + "="*72)
             print("TAHAP 3: HASIL ANALISIS KELAYAKAN AIR")
-            print("="*85)
+            print("="*72)
             print(f"\nNilai K yang digunakan : {best_k}\n")
             
             print("Hasil Voting KNN:")
@@ -311,7 +292,7 @@ def main():
                 print("LAYAK MINUM (Potable)\n")
             else:
                 print("TIDAK LAYAK MINUM (Not Potable)\n")
-            print("="*85)
+            print("="*72)
             
             lanjut = input("\nApakah Anda ingin mengecek sampel air lagi? (y/n): ")
             if lanjut.lower() != 'y':
